@@ -12,8 +12,6 @@ services:
     ports:
       - "8008:8008"
       - "5432:5432"
-    depends_on:
-      - db
     environment:
       - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
       - SYNAPSE_CONFIG_DIR=/data
