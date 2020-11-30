@@ -167,15 +167,7 @@ def run_generate_config(environ, ownership):
         "--open-private-ports",
     ]
     # log("running %s" % (args, ))
-
-    if ownership is not None:
-        # make sure that synapse has perms to write to the data dir.
-        subprocess.check_output(["chown", ownership, data_dir])
-
-        args = ["gosu", ownership] + args
-        os.execv("/usr/sbin/gosu", args)
-    else:
-        os.execv("/usr/local/bin/python", args)
+    os.execv("/usr/local/bin/python", args)
 
 
 def main(args, environ):
