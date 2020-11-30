@@ -2,15 +2,6 @@ version: "3.8"
 
 services:
 
-  db:
-    image: postgres
-    volumes:
-      - ./pgsql:/docker-entrypoint-initdb.d
-    environment:
-      - POSTGRES_USER=synapse_user
-      - POSTGRES_PASSWORD=synapse_password
-      - POSTGRES_PORT=5432
-
   synapse:
     build: ./synapse
     tty: true
@@ -20,6 +11,7 @@ services:
       - ../data:/data
     ports:
       - "8008:8008"
+      - "5432:5432"
     depends_on:
       - db
     environment:
