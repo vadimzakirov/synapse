@@ -236,13 +236,8 @@ running with 'migrate_config'. See the README for more details.
         args += ["--config-path", config_path]
 
     log("Starting synapse with args " + " ".join(args))
+    os.execv("/usr/local/bin/python", args)
 
-    args = ["python"] + args
-    if ownership is not None:
-        args = ["gosu", ownership] + args
-        os.execv("/usr/sbin/gosu", args)
-    else:
-        os.execv("/usr/local/bin/python", args)
 
 
 if __name__ == "__main__":
