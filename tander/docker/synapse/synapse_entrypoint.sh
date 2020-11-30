@@ -9,7 +9,7 @@ if [ -e "$SYNAPSE_CONFIG_PATH" ]
   else
     sh /scripts/make_hs_config.sh
 fi
-python /scripts/start.py
+/usr/local/bin/python -m synapse.app.homeserver --config-path="$SYNAPSE_CONFIG_PATH"
 while [ 1 ]
 do
   cat
