@@ -9,6 +9,7 @@ services:
       - ../../synapse:/synapse
       - ./synapse:/scripts
       - ../data:/data
+    network_mode: host
     ports:
       - "8008:8008"
       - "5432:5432"
