@@ -107,7 +107,6 @@ def start_reactor(
     """
 
     install_dns_limiter(reactor)
-
     def run():
         logger.info("Running")
         change_resource_limit(soft_file_limit)

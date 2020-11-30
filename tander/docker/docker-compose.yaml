@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+
+  db:
+    image: postgres
+    volumes:
+      - ./pgsql:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_USER=synapse_user
+      - POSTGRES_PASSWORD=synapse_password
+      - POSTGRES_PORT=5432
+
+  synapse:
+    build: ./synapse
+    tty: true
+    volumes:
+      - ../../synapse:/synapse
+      - ./synapse:/scripts
+      - ../data:/data
+    ports:
+      - "8008:8008"
+    depends_on:
+      - db
+    environment:
+      - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
+      - SYNAPSE_CONFIG_DIR=/data
+      - START_PORT=8008
+      - SYNAPSE_SERVER_NAME=localhost
+      # Connectable DB
+      - CONNECT_DB_NAME=synapse_db_docker
+      - CONNECT_DB_USER=synapse_user
+      - CONNECT_DB_PASSWORD=synapse_password
+      - CONNECT_DB_PORT=5432
+    healthcheck:
+      test: [ "CMD", "curl", "-fSs", "http://localhost:8008/health" ]
+      interval: 1m
+      timeout: 5s
+    entrypoint: /scripts/synapse_entrypoint.sh
+
