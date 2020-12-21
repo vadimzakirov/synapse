@@ -75,7 +75,8 @@ class EventTypes:
     Redaction = "m.room.redaction"
     ThirdPartyInvite = "m.room.third_party_invite"
     RelatedGroups = "m.room.related_groups"
-
+    IsChannel = "m.room.is_channel"
+    HideMembers = "m.room.hide_members"
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
     Encrypted = "m.room.encrypted"

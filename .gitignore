@@ -44,3 +44,4 @@ _trial_temp*/
 /htmlcov
 /pip-wheel-metadata/
 data/
+synapse/static/

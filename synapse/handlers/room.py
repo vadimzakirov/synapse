@@ -676,9 +676,14 @@ class RoomCreationHandler(BaseHandler):
 
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
-
+        is_channel = config.get('is_channel', False)
+        hide_members = config.get('hide_members', False)
         room_id = await self._generate_room_id(
-            creator_id=user_id, is_public=is_public, room_version=room_version,
+            creator_id=user_id,
+            is_public=is_public,
+            room_version=room_version,
+            is_channel=is_channel,
+            hide_members=hide_members
         )
 
         # Check whether this visibility value is blocked by a third party module
@@ -770,12 +775,42 @@ class RoomCreationHandler(BaseHandler):
                 },
                 ratelimit=False,
             )
-
+        if hide_members:
+            (
+                _,
+                last_stream_id,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.HideMembers,
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "state_key": "",
+                    "content": {"hide_members": hide_members},
+                },
+                ratelimit=False,
+            )
+        if is_channel:
+            (
+                _,
+                last_stream_id,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.IsChannel,
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "state_key": "",
+                    "content": {"is_channel": is_channel},
+                },
+                ratelimit=False,
+            )
         # we avoid dropping the lock between invites, as otherwise joins can
         # start coming in and making the createRoom slow.
         #
         # we also don't need to check the requester's shadow-ban here, as we
         # have already done so above (and potentially emptied invite_list).
+
         with (await self.room_member_handler.member_linearizer.queue((room_id,))):
             content = {}
             is_direct = config.get("is_direct", None)
@@ -969,13 +1004,15 @@ class RoomCreationHandler(BaseHandler):
         return last_sent_stream_id
 
     async def _generate_room_id(
-        self, creator_id: str, is_public: bool, room_version: RoomVersion,
+        self, creator_id: str, is_public: bool, room_version: RoomVersion, **kwargs
     ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
         attempts = 0
         while attempts < 5:
             try:
+                is_channel = kwargs.get('is_channel', False)
+                hide_members = kwargs.get('hide_members', False)
                 random_string = stringutils.random_string(18)
                 gen_room_id = RoomID(random_string, self.hs.hostname).to_string()
                 await self.store.store_room(
@@ -983,6 +1020,8 @@ class RoomCreationHandler(BaseHandler):
                     room_creator_user_id=creator_id,
                     is_public=is_public,
                     room_version=room_version,
+                    is_channel=is_channel,
+                    hide_members=hide_members
                 )
                 return gen_room_id
             except StoreError:

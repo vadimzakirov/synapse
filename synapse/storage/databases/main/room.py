@@ -1196,6 +1196,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         room_creator_user_id: str,
         is_public: bool,
         room_version: RoomVersion,
+        **kwargs
     ):
         """Stores a room.
 
@@ -1219,6 +1220,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                         "creator": room_creator_user_id,
                         "is_public": is_public,
                         "room_version": room_version.identifier,
+                        "is_channel": kwargs.get('is_channel', False),
+                        "hide_members": kwargs.get('hide_members', False)
                     },
                 )
                 if is_public:
