@@ -31,6 +31,7 @@ _trial_temp*/
 /.idea/
 /.ropeproject/
 /.vscode/
+.DS_Store
 
 # build products
 !/.coveragerc
@@ -45,3 +46,4 @@ _trial_temp*/
 /pip-wheel-metadata/
 data/
 synapse/static/
+testmatrix2.pem
