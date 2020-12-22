@@ -933,7 +933,7 @@ class JoinedRoomsRestServlet(RestServlet):
 # New
 
 
-class PollCreateRestServlet(TransactionRestServlet):
+class PollCreateRestServlet(RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
@@ -970,7 +970,7 @@ class PollCreateRestServlet(TransactionRestServlet):
         return 200, {}
 
 
-class AddPollOptionRestServlet(TransactionRestServlet):
+class AddPollOptionRestServlet(RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
@@ -1106,7 +1106,7 @@ class GetPollInfoRestServlet(RestServlet):
 #         defer.returnValue((200, {"allowed": True}))
 
 
-class IncrementPollOptionRestServlet(TransactionRestServlet):
+class IncrementPollOptionRestServlet(RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
@@ -1144,7 +1144,7 @@ class IncrementPollOptionRestServlet(TransactionRestServlet):
         return 200, {}
 
 
-class FinishPollRestServlet(TransactionRestServlet):
+class FinishPollRestServlet(RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
