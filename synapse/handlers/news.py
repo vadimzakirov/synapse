@@ -194,9 +194,6 @@ class NewsModificationHandler(BaseHandler):
             ResourceLimitError if server is blocked to some resource being
             exceeded
         """
-        if ratelimit:
-            await self.ratelimit(requester)
-        ret_dict = {}
         info = await self.store.get_news_by_news_id(news_id)
         return info
 
