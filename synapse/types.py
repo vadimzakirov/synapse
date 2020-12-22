@@ -739,3 +739,9 @@ def get_verify_key_from_cross_signing_key(key_info):
     # and return that one key
     for key_id, key_data in keys.items():
         return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))
+
+
+class PollID(DomainSpecificString):
+    """Structure representing a poll id. """
+
+    SIGIL = "%"

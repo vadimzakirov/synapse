@@ -18,9 +18,6 @@
 """Contains functions for performing events on rooms."""
 
 import logging
-from typing import Dict, List, Any, Union
-
-from twisted.internet import defer
 from synapse.handlers._base import BaseHandler
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.types import PollID, StreamToken, UserID
