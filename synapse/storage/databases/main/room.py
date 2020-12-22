@@ -1713,6 +1713,75 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
     """
     SETTERS
     """
+    async def set_root_bot_menu(self, menu_id):
+        await self.db_pool.simple_update_one(
+            table="bot_menus",
+            keyvalues={"menu_id": menu_id},
+            updatevalues={"root": True},
+            desc="update_menu_as_root",
+        )
+
+    async def uncheck_menu_as_root(self, menu_id):
+        await self.db_pool.simple_update_one(
+            table="bot_menus",
+            keyvalues={"menu_id": menu_id, "root": True},
+            updatevalues={"root": False},
+            desc="uncheck_menu_as_root",
+        )
+
+    async def add_menu_to_bot(self, bot_id, menu_id):
+        def add_menu_to_bot_txn(txn):
+            self.db_pool.simple_insert_txn(
+                txn,
+                "bot_menus",
+                {
+                    "menu_id": menu_id,
+                    "bot_user_id": bot_id,
+                    "root": False,
+                },
+            )
+        await self.db_pool.runInteraction("add_menu_to_bot_txn", add_menu_to_bot_txn)
+
+    async def add_room_to_bot(self, bot_id, room_id):
+        def add_room_to_bot_txn(txn):
+            self.db_pool.simple_insert_txn(
+                txn,
+                "bot_rooms",
+                {
+                    "bot_user_id": bot_id,
+                    "room_id": room_id,
+                },
+            )
+
+        await self.db_pool.runInteraction("add_room_to_bot_txn", add_room_to_bot_txn)
+
+    async def add_button_to_menu(self, menu_id, button_id, button_text):
+        def store_button_txn(txn):
+            self.db_pool.simple_insert_txn(
+                txn,
+                "menu_buttons",
+                {
+                    "button_id": button_id,
+                    "menu_id": menu_id,
+                    "button_text": button_text,
+                },
+            )
+
+        await self.db_pool.runInteraction("store_button_txn", store_button_txn)
+
+    async def add_button_action(self, button_id, event_type, event_content):
+        def store_action_txn(txn):
+            self.db_pool.simple_insert_txn(
+                txn,
+                "button_content",
+                {
+                    "button_id": button_id,
+                    "event_type": event_type,
+                    "event_content": event_content,
+                },
+            )
+
+        await self.db_pool.runInteraction("_simple_insert_txn", store_action_txn)
 
     """
     Bot menus -- END --

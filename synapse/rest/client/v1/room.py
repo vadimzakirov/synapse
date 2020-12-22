@@ -49,6 +49,8 @@ from synapse.util import json_decoder
 from synapse.util.stringutils import random_string
 from synapse.handlers.polls import PollCreationHandler, PollModificationHandler, GetPollInfoHandler
 from synapse.handlers.news import NewsCreationHandler, NewsModificationHandler
+from synapse.handlers.bots import BotMenuHandler
+
 MYPY = False
 if MYPY:
     import synapse.server
@@ -1215,186 +1217,163 @@ class SetReadMarkerRestServlet(TransactionRestServlet):
 #
 # # GETTERS
 #
-# class GetRootMenuRestServlet(RestServlet):
-#     PATTERNS = client_patterns("/getRootMenu/(?P<room_id>[^/]*)$", v1=True)
-#
-#     def __init__(self, hs):
-#         super(GetRootMenuRestServlet, self).__init__()
-#         self.get_info = BotMenuHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     @defer.inlineCallbacks
-#     def on_GET(self, request, room_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.get_info.get_root_menu(requester, room_id)
-#         defer.returnValue((200, info))
-#
-#
-# class GetMenuButtonsRestServlet(RestServlet):
-#     PATTERNS = client_patterns("/getMenuButtons/(?P<menu_id>[^/]*)$", v1=True)
-#
-#     def __init__(self, hs):
-#         super(GetMenuButtonsRestServlet, self).__init__()
-#         self.get_info = BotMenuHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     @defer.inlineCallbacks
-#     def on_GET(self, request, menu_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.get_info.get_menu_buttons(requester, menu_id)
-#         defer.returnValue((200, info))
-#
-#
-# class GetFullMenuButtonsRestServlet(RestServlet):
-#     PATTERNS = client_patterns("/getFullMenuButtons/(?P<menu_id>[^/]*)$", v1=True)
-#
-#     def __init__(self, hs):
-#         super(GetFullMenuButtonsRestServlet, self).__init__()
-#         self.get_info = BotMenuHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     @defer.inlineCallbacks
-#     def on_GET(self, request, menu_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.get_info.get_full_menu_buttons(requester, menu_id)
-#         defer.returnValue((200, info))
-#
-#
-# class GetButtonActionRestServlet(RestServlet):
-#     PATTERNS = client_patterns("/getButtonAction/(?P<button_id>[^/]*)$", v1=True)
-#
-#     def __init__(self, hs):
-#         super(GetButtonActionRestServlet, self).__init__()
-#         self.get_info = BotMenuHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     @defer.inlineCallbacks
-#     def on_GET(self, request, button_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.get_info.get_button_action(requester, button_id)
-#         defer.returnValue((200, info))
-#
-#
-# # SETTERS
-# class SetRootMenuRestServet(TransactionRestServlet):
-#     def __init__(self, hs):
-#         super(SetRootMenuRestServet, self).__init__(hs)
-#         self.servlet_handler = BotMenuHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     def register(self, http_server):
-#
-#         http_server.register_paths(
-#             "POST",
-#             client_patterns("/setMenuAsRoot/(?P<menu_id>[^/]*)$", v1=True),
-#             self.on_POST,
-#         )
-#
-#     def on_PUT(self, request, txn_id):
-#         return self.txns.fetch_or_execute_request(
-#             request, self.on_POST, request
-#         )
-#
-#     @defer.inlineCallbacks
-#     def on_POST(self, request, menu_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.servlet_handler.set_root_menu(requester, menu_id=menu_id)
-#         return 200, info
-#
-#     def on_OPTIONS(self, request):
-#         return 200, {}
-#
-#
-# class AddRoomMenuRestServlet(TransactionRestServlet):
-#     def __init__(self, hs):
-#         super(AddRoomMenuRestServlet, self).__init__(hs)
-#         self.servlet_handler = BotMenuHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     def register(self, http_server):
-#
-#         http_server.register_paths(
-#             "POST",
-#             client_patterns("/AddBotMenu/bot/(?P<bot_id>[^/]*)$", v1=True),
-#             self.on_POST,
-#         )
-#
-#     def on_PUT(self, request, txn_id):
-#         return self.txns.fetch_or_execute_request(
-#             request, self.on_POST, request
-#         )
-#
-#     @defer.inlineCallbacks
-#     def on_POST(self, request, bot_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.servlet_handler.add_menu_to_bot(requester, bot_id=bot_id)
-#         return 200, info
-#
-#     def on_OPTIONS(self, request):
-#         return 200, {}
-#
-#
-# class AddMenuButtonRestServlet(TransactionRestServlet):
-#     def __init__(self, hs):
-#         super(AddMenuButtonRestServlet, self).__init__(hs)
-#         self.servlet_handler = BotMenuHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     def register(self, http_server):
-#
-#         http_server.register_paths(
-#             "POST",
-#             client_patterns("/AddButtonToMenu/menu/(?P<menu_id>[^/]*)$", v1=True),
-#             self.on_POST,
-#         )
-#
-#     def get_config(self, request):
-#         user_supplied_config = parse_json_object_from_request(request)
-#         return user_supplied_config
-#
-#     def on_PUT(self, request, txn_id):
-#         return self.txns.fetch_or_execute_request(
-#             request, self.on_POST, request
-#         )
-#
-#     @defer.inlineCallbacks
-#     def on_POST(self, request, menu_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         config = self.get_config(request)
-#         info = yield self.servlet_handler.add_button_to_menu(requester, menu_id=menu_id, config=config)
-#         return 200, info
-#
-#     def on_OPTIONS(self, request):
-#         return 200, {}
-#
-#
-# class MakeBotActionRestServlet(TransactionRestServlet):
-#     def __init__(self, hs):
-#         super(MakeBotActionRestServlet, self).__init__(hs)
-#         self.servlet_handler = BotMenuHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     def register(self, http_server):
-#
-#         http_server.register_paths(
-#             "POST",
-#             client_patterns("/makeButtonAction/(?P<button_id>[^/]*)/room/(?P<room_id>[^/]*)$", v1=True),
-#             self.on_POST,
-#         )
-#
-#     def on_PUT(self, request, txn_id):
-#         return self.txns.fetch_or_execute_request(
-#             request, self.on_POST, request
-#         )
-#
-#     @defer.inlineCallbacks
-#     def on_POST(self, request, button_id, room_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.servlet_handler.make_bot_action(requester, button_id=button_id, room_id=room_id)
-#         return 200, info
-#
-#     def on_OPTIONS(self, request):
-#         return 200, {}
+class GetRootMenuRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getRootMenu/(?P<room_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetRootMenuRestServlet, self).__init__()
+        self.get_info = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_root_menu(requester, room_id)
+        return 200, info
+
+
+class GetMenuButtonsRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getMenuButtons/(?P<menu_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetMenuButtonsRestServlet, self).__init__()
+        self.get_info = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, menu_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_menu_buttons(requester, menu_id)
+        return 200, info
+
+
+class GetFullMenuButtonsRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getFullMenuButtons/(?P<menu_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetFullMenuButtonsRestServlet, self).__init__()
+        self.get_info = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, menu_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_full_menu_buttons(requester, menu_id)
+        return 200, info
+
+
+class GetButtonActionRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getButtonAction/(?P<button_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetButtonActionRestServlet, self).__init__()
+        self.get_info = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, button_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_button_action(requester, button_id)
+        return 200, info
+
+
+# SETTERS
+class SetRootMenuRestServlet(TransactionRestServlet):
+
+    def __init__(self, hs):
+        super(SetRootMenuRestServlet, self).__init__(hs)
+        self.servlet_handler = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/setMenuAsRoot/(?P<menu_id>[^/]*)$"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request, menu_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.servlet_handler.set_root_menu(requester, menu_id=menu_id)
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class AddRoomMenuRestServlet(TransactionRestServlet):
+    def __init__(self, hs):
+        super(AddRoomMenuRestServlet, self).__init__(hs)
+        self.servlet_handler = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/AddBotMenu/bot/(?P<bot_id>[^/]*)$"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request, bot_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.servlet_handler.add_menu_to_bot(requester, bot_id=bot_id)
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class AddMenuButtonRestServlet(TransactionRestServlet):
+    def __init__(self, hs):
+        super(AddMenuButtonRestServlet, self).__init__(hs)
+        self.servlet_handler = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/AddButtonToMenu/menu/(?P<menu_id>[^/]*)$"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def get_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request, menu_id):
+        requester = await self.auth.get_user_by_req(request)
+        config = self.get_config(request)
+        info = await self.servlet_handler.add_button_to_menu(requester, menu_id=menu_id, config=config)
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class MakeBotActionRestServlet(TransactionRestServlet):
+    def __init__(self, hs):
+        super(MakeBotActionRestServlet, self).__init__(hs)
+        self.servlet_handler = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/makeButtonAction/(?P<button_id>[^/]*)/room/(?P<room_id>[^/]*)$"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request, button_id, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.servlet_handler.make_bot_action(requester, button_id=button_id, room_id=room_id)
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
 
 
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
@@ -1460,6 +1439,15 @@ def register_servlets(hs, http_server):
     GetUnreadNewsByUserRestServlet(hs).register(http_server)
     NewsCreateRestServlet(hs).register(http_server)
     SetReadMarkerRestServlet(hs).register(http_server)
+    GetRootMenuRestServlet(hs).register(http_server)
+    GetMenuButtonsRestServlet(hs).register(http_server)
+    GetFullMenuButtonsRestServlet(hs).register(http_server)
+    SetReadMarkerRestServlet(hs).register(http_server)
+    GetButtonActionRestServlet(hs).register(http_server)
+    SetRootMenuRestServlet(hs).register(http_server)
+    AddRoomMenuRestServlet(hs).register(http_server)
+    AddMenuButtonRestServlet(hs).register(http_server)
+    MakeBotActionRestServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):
