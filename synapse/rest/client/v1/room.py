@@ -944,13 +944,6 @@ class PollCreateRestServlet(TransactionRestServlet):
     def register(self, http_server):
         PATTERNS = "/createPoll"
         register_txn_path(self, PATTERNS, http_server)
-        # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
-
-        http_server.register_paths(
-            "POST",
-            client_patterns("/createPoll(?:/.*)?$", v1=True),
-            self.on_POST,
-        )
 
     def get_poll_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
@@ -981,14 +974,7 @@ class AddPollOptionRestServlet(TransactionRestServlet):
     def register(self, http_server):
         PATTERNS = "/addPollOption"
         register_txn_path(self, PATTERNS, http_server)
-        # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
 
-        http_server.register_paths(
-            "POST",
-            client_patterns("/addPollOption(?:/.*)?$", v1=True),
-            self.on_POST,
-
-        )
 
     def get_poll_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
@@ -1119,12 +1105,6 @@ class IncrementPollOptionRestServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
 
-        http_server.register_paths(
-            "POST",
-            client_patterns("/incrementPollOption(?:/.*)?$", v1=True),
-            self.on_POST,
-
-        )
 
     def get_poll_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
@@ -1156,13 +1136,6 @@ class FinishPollRestServlet(TransactionRestServlet):
         PATTERNS = "/finishPoll"
         register_txn_path(self, PATTERNS, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
-
-        http_server.register_paths(
-            "POST",
-            client_patterns("/finishPoll(?:/.*)?$", v1=True),
-            self.on_POST,
-
-        )
 
     def get_poll_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
