@@ -38,9 +38,9 @@ class NewsCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.config = hs.config
 
-    async def create_news(self, requester, config, ratelimit=True):  # Step 2 (Create room handler)
+    async def create_news(self, requester, config, ratelimit=False):  # Step 2 (Create room handler)
         user_id = requester.user.to_string()
-
+        
         await self.auth.check_auth_blocking(user_id)
 
         if ratelimit:
@@ -132,7 +132,7 @@ class NewsModificationHandler(BaseHandler):
             ret_dict["news_info"].append(elem)
         return ret_dict
 
-    async def get_unread_news_by_room_id(self, requester, room_id, user_id, ratelimit=True):  # Step 2 (Create room handler)
+    async def get_unread_news_by_room_id(self, requester, room_id, user_id, ratelimit=False):  # Step 2 (Create room handler)
         """ Creates a new news article.
 
         Args:
@@ -168,7 +168,7 @@ class NewsModificationHandler(BaseHandler):
         ret_dict["news_info"] = info
         return ret_dict
 
-    async def get_news_by_news_id(self, requester, news_id, ratelimit=True):  # Step 2 (Create room handler)
+    async def get_news_by_news_id(self, requester, news_id, ratelimit=False):  # Step 2 (Create room handler)
         """ Creates a new news article.
 
         Args:
@@ -200,7 +200,7 @@ class NewsModificationHandler(BaseHandler):
         info = await self.store.get_news_by_news_id(news_id)
         return info
 
-    async def set_news_read_marker(self, requester, config, ratelimit=True):  # Step 2 (Create room handler)
+    async def set_news_read_marker(self, requester, config, ratelimit=False):  # Step 2 (Create room handler)
         """ Creates a new news article.
 
         Args:
