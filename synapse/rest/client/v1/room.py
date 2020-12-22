@@ -1152,79 +1152,65 @@ class FinishPollRestServlet(TransactionRestServlet):
         return 200, {}
 
 
-# class NewsCreateRestServlet(TransactionRestServlet):
-#
-#     def __init__(self, hs):
-#         super(NewsCreateRestServlet, self).__init__(hs)
-#         self._news_creation_handler = NewsCreationHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     def register(self, http_server):
-#         PATTERNS = "/addNews"
-#         register_txn_path(self, PATTERNS, http_server)
-#         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
-#
-#         http_server.register_paths(
-#             "POST",
-#             client_patterns("/addNews(?:/.*)?$", v1=True),
-#             self.on_POST,
-#         )
-#
-#     def get_news_config(self, request):
-#         user_supplied_config = parse_json_object_from_request(request)
-#         return user_supplied_config
-#
-#     def on_PUT(self, request, txn_id):
-#         return self.txns.fetch_or_execute_request(
-#             request, self.on_POST, request
-#         )
-#
-#     @defer.inlineCallbacks
-#     def on_POST(self, request):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self._news_creation_handler.create_news(requester, self.get_news_config(request))
-#         return 200, info
-#
-#     def on_OPTIONS(self, request):
-#         return 200, {}
-#
-#
-# class SetReadMarkerRestServlet(TransactionRestServlet):
-#
-#     def __init__(self, hs):
-#         super(SetReadMarkerRestServlet, self).__init__(hs)
-#         self._news_mod_handler = NewsModificationHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     def register(self, http_server):
-#         PATTERNS = "/setNewsReadMarker"
-#         register_txn_path(self, PATTERNS, http_server)
-#
-#         http_server.register_paths(
-#             "POST",
-#             client_patterns("/setNewsReadMarker(?:/.*)?$", v1=True),
-#             self.on_POST,
-#         )
-#
-#     def get_news_config(self, request):
-#         user_supplied_config = parse_json_object_from_request(request)
-#         return user_supplied_config
-#
-#     def on_PUT(self, request, txn_id):
-#         return self.txns.fetch_or_execute_request(
-#             request, self.on_POST, request
-#         )
-#
-#     @defer.inlineCallbacks
-#     def on_POST(self, request):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self._news_mod_handler.set_news_read_marker(requester, self.get_news_config(request))
-#         return 200, info
-#
-#     def on_OPTIONS(self, request):
-#         return 200, {}
-#
-#
+class NewsCreateRestServlet(TransactionRestServlet):
+
+    def __init__(self, hs):
+        super(NewsCreateRestServlet, self).__init__(hs)
+        self._news_creation_handler = NewsCreationHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/addNews"
+        register_txn_path(self, PATTERNS, http_server)
+        # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
+
+    def get_news_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self._news_creation_handler.create_news(requester, self.get_news_config(request))
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class SetReadMarkerRestServlet(TransactionRestServlet):
+
+    def __init__(self, hs):
+        super(SetReadMarkerRestServlet, self).__init__(hs)
+        self._news_mod_handler = NewsModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/setNewsReadMarker"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def get_news_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self._news_mod_handler.set_news_read_marker(requester, self.get_news_config(request))
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
 # # Bot Menus
 #
 # # GETTERS
@@ -1469,6 +1455,9 @@ def register_servlets(hs, http_server):
     GetPollInfoRestServlet(hs).register(http_server)
     IncrementPollOptionRestServlet(hs).register(http_server)
     FinishPollRestServlet(hs).register(http_server)
+    GetNewsByUserRestServlet(hs).register(http_server)
+    GetNewsByIdRestServlet(hs).register(http_server)
+    GetUnreadNewsByUserRestServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):
