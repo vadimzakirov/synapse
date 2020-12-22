@@ -50,6 +50,7 @@ from synapse.util.stringutils import random_string
 from synapse.handlers.polls import PollCreationHandler, PollModificationHandler, GetPollInfoHandler
 from synapse.handlers.news import NewsCreationHandler, NewsModificationHandler
 from synapse.handlers.bots import BotMenuHandler
+from synapse.handlers.permissions import PermissionsListHandler
 
 MYPY = False
 if MYPY:
@@ -1010,19 +1011,18 @@ class GetPollInfoRestServlet(RestServlet):
         return 200, info
 
 
-# class GetPermissionsRestServlet(RestServlet):
-#     PATTERNS = client_patterns("/getPermissions(?:/.*)?$", v1=True)
-#
-#     def __init__(self, hs):
-#         super(GetPermissionsRestServlet, self).__init__()
-#         self.get_info = PermissionsListHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     @defer.inlineCallbacks
-#     def on_GET(self, request):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.get_info.get_permissions(requester)
-#         defer.returnValue((200, info))
+class GetPermissionsRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getPermissions(?:/.*)?$", v1=True)
+
+    def __init__(self, hs):
+        super(GetPermissionsRestServlet, self).__init__()
+        self.get_info = PermissionsListHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_permissions(requester)
+        return 200, info
 
 
 class GetNewsByUserRestServlet(RestServlet):
@@ -1448,6 +1448,7 @@ def register_servlets(hs, http_server):
     AddRoomMenuRestServlet(hs).register(http_server)
     AddMenuButtonRestServlet(hs).register(http_server)
     MakeBotActionRestServlet(hs).register(http_server)
+    GetPermissionsRestServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):
