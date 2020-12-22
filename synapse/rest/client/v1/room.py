@@ -1458,6 +1458,8 @@ def register_servlets(hs, http_server):
     GetNewsByUserRestServlet(hs).register(http_server)
     GetNewsByIdRestServlet(hs).register(http_server)
     GetUnreadNewsByUserRestServlet(hs).register(http_server)
+    NewsCreateRestServlet(hs).register(http_server)
+    SetReadMarkerRestServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):
