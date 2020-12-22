@@ -933,11 +933,11 @@ class JoinedRoomsRestServlet(RestServlet):
 # New
 
 
-class PollCreateRestServlet(RestServlet):
+class PollCreateRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
-        super(PollCreateRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self._poll_creation_handler = PollCreationHandler(hs)
         self.auth = hs.get_auth()
 
@@ -970,11 +970,11 @@ class PollCreateRestServlet(RestServlet):
         return 200, {}
 
 
-class AddPollOptionRestServlet(RestServlet):
+class AddPollOptionRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
-        super(AddPollOptionRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self._add_option_to_poll = PollModificationHandler(hs)
         self.auth = hs.get_auth()
 
@@ -1012,7 +1012,7 @@ class GetPollInfoRestServlet(RestServlet):
     PATTERNS = client_patterns("/getPollsInfo/(?P<room_id>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(GetPollInfoRestServlet, self).__init__()
+        super().__init__()
         self.get_info = GetPollInfoHandler(hs)
         self.auth = hs.get_auth()
 
@@ -1106,11 +1106,11 @@ class GetPollInfoRestServlet(RestServlet):
 #         defer.returnValue((200, {"allowed": True}))
 
 
-class IncrementPollOptionRestServlet(RestServlet):
+class IncrementPollOptionRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
-        super(IncrementPollOptionRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self._inc_option = PollModificationHandler(hs)
         self.auth = hs.get_auth()
 
@@ -1144,11 +1144,11 @@ class IncrementPollOptionRestServlet(RestServlet):
         return 200, {}
 
 
-class FinishPollRestServlet(RestServlet):
+class FinishPollRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
-        super(FinishPollRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self._finish_poll = PollModificationHandler(hs)
         self.auth = hs.get_auth()
 
