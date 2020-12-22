@@ -1279,7 +1279,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         retcol: str,
         allow_none: Literal[False] = False,
-        desc: str = "simple_select_one_onecol",
+        desc: str = "5_one_onecol",
     ) -> Any:
         ...
 
@@ -1981,6 +1981,9 @@ class DatabasePool:
             return None
 
         return cls.cursor_to_dict(txn)
+
+    def _simple_select_one(self, table, keyvalues, retcols, desc, allow_none):
+        pass
 
 
 def make_in_list_sql_clause(

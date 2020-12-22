@@ -76,6 +76,103 @@ class DirectoryWorkerStore(SQLBaseStore):
             desc="get_aliases_for_room",
         )
 
+    async def get_association_from_room_ids(self, room_id):
+        """ Get's the room_id and server list for a given room_alias
+
+        Args:
+            poll_alias (PollAlias)
+
+        Returns:
+            Deferred: results in namedtuple with keys "room_id" and
+            "servers" or None if no association can be found
+        """
+
+        room_id = await self.db_pool.simple_select_one_onecol(
+            "rooms",
+            {"room_id": room_id},
+            "room_id",
+            allow_none=True,
+            desc="get_association_from_poll_alias",
+        )
+
+        if room_id:
+            return True
+        else:
+            return None
+
+    async def get_association_from_news_ids(self, news_id):
+        """ Get's the room_id and server list for a given room_alias
+
+        Args:
+            poll_alias (PollAlias)
+
+        Returns:
+            Deferred: results in namedtuple with keys "room_id" and
+            "servers" or None if no association can be found
+        """
+
+        news_id = await self.db_pool.simple_select_one_onecol(
+            "news",
+            {"news_id": news_id},
+            "news_id",
+            allow_none=True,
+            desc="get_association_from_news_ids",
+        )
+
+        if news_id:
+            return True
+        else:
+            return None
+
+    async def get_association_from_poll_ids(self, poll_id):
+        """ Get's the room_id and server list for a given room_alias
+
+        Args:
+            poll_alias (PollAlias)
+
+        Returns:
+            Deferred: results in namedtuple with keys "room_id" and
+            "servers" or None if no association can be found
+        """
+
+        poll_id = await self.db_pool.simple_select_onecol(
+            "polls",
+            {"poll_id": poll_id},
+            "room_id",
+            desc="get_association_from_poll_alias",
+        )
+
+        if poll_id:
+            return True
+        else:
+            return None
+
+    async def get_association_from_poll_options(self, poll_id, option_number):
+        """ Get's the room_id and server list for a given room_alias
+
+        Args:
+            poll_alias (PollAlias)
+
+        Returns:
+            Deferred: results in namedtuple with keys "room_id" and
+            "servers" or None if no association can be found
+        """
+
+        option_number = await self.db_pool.simple_select_onecol(
+            "polls_options",
+            {
+                "poll_id": poll_id,
+                "number": option_number
+            },
+            "number",
+            desc="get_association_from_poll_options",
+        )
+
+        if option_number:
+            return True
+        else:
+            return None
+
 
 class DirectoryStore(DirectoryWorkerStore):
     async def create_room_alias_association(

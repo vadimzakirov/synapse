@@ -1602,3 +1602,322 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             self.is_room_blocked,
             (room_id,),
         )
+
+    async def get_root_bot_menu(self, bot_id):
+        root_menu_dict = await self.db_pool.simple_select_one(
+            table="bot_menus",
+            keyvalues={"bot_user_id": bot_id, "root": True},
+            retcols=["menu_id"],
+            desc="get_root_bot_menu",
+            allow_none=True
+        )
+        return root_menu_dict
+
+    async def has_room_bot_menu(self, room_id):
+        root_menu_dict = await self.db_pool.simple_select_one(
+            table="bot_menus",
+            keyvalues={"room_id": room_id, "root": True},
+            retcols=["menu_id"],
+            desc="get_polls_creator",
+            allow_none=True,
+        )
+        return True if root_menu_dict else False
+
+    async def get_menu_buttons(self, menu_id):
+        buttons_dict = await self.db_pool.simple_select_list(
+            table="menu_buttons",
+            keyvalues={"menu_id": menu_id},
+            retcols=["menu_id", "button_id", "button_text"],
+            desc="get_menu_buttons"
+        )
+        return buttons_dict
+
+    async def get_menu_id_association(self, menu_id):
+        menu_dict = await self.db_pool.simple_select_one(
+            table="bot_menus",
+            keyvalues={"menu_id": menu_id},
+            retcols=["menu_id"],
+            desc="get_menu_buttons",
+            allow_none=True
+        )
+        return True if menu_dict else False
+
+    async def get_bot_room_association(self, room_id, bot_id):
+        bot_room_dict = await self.db_pool.simple_select_one(
+            table="bot_rooms",
+            keyvalues={"room_id": room_id, "bot_user_id": bot_id},
+            retcols=["room_id"],
+            desc="get_bot_room_association",
+            allow_none=True
+        )
+        return True if bot_room_dict else False
+
+    async def get_bot_by_room(self, room_id):
+        bot_dict = await self.db_pool.simple_select_one(
+            table="bot_rooms",
+            keyvalues={"room_id": room_id},
+            retcols=["bot_user_id"],
+            desc="get_bot_by_room",
+            allow_none=True
+        )
+        return bot_dict
+
+    async def check_user_as_bot(self, user_id):
+        bot_dict = await self.db_pool.simple_select_one(
+            table="bots",
+            keyvalues={"user_id": user_id},
+            retcols=["user_id"],
+            desc="check_user_as_bot",
+            allow_none=True
+        )
+        return True if bot_dict else False
+
+    async def get_menu_in_room_association(self, menu_id, room_id):
+        menu_dict = await self.db_pool.simple_select_one(
+            table="bot_menus",
+            keyvalues={"menu_id": menu_id, "room_id": room_id},
+            retcols=["menu_id"],
+            desc="get_menu_buttons",
+            allow_none=True
+        )
+        return menu_dict
+
+    async def get_room_id_association(self, room_id):
+        room_dict = await self.db_pool.simple_select_one(
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            retcols=["room_id"],
+            desc="get_room_id_association",
+            allow_none=True
+        )
+        return True if room_dict else False
+
+    async def get_button_action(self, button_id):
+        action_dict = await self.db_pool.simple_select_one(
+            table="button_content",
+            keyvalues={"button_id": button_id},
+            retcols=["event_content", "event_type"],
+            desc="get_button_action",
+            allow_none=True
+        )
+        return action_dict
+
+    async def set_root_bot_menu(self, menu_id):
+        await self.db_pool.simple_update_one(
+            table="bot_menus",
+            keyvalues={"menu_id": menu_id},
+            updatevalues={"root": True},
+            desc="update_menu_as_root",
+        )
+
+    """
+    SETTERS
+    """
+
+    """
+    Bot menus -- END --
+    """
+
+    async def store_poll(self, poll_id, poll_creator_user_id, poll_alias, room_id):
+        # TODO Change docstrings for this method
+        """Stores a poll.
+
+        Args:
+            room_id (str): The desired room ID, can be None.
+            room_creator_user_id (str): The user ID of the room creator.
+            is_public (bool): True to indicate that this room should appear in
+            is_channel (bool): Tru to indicate that this room is channel
+            public room lists.
+        Raises:
+            StoreError if the room could not be stored.
+        """
+        try:
+
+            def store_poll_txn(txn):
+                self.db_pool.simple_insert_txn(
+                    txn,
+                    "polls",
+                    {
+                        "room_id": room_id,
+                        "poll_creator_user_id": poll_creator_user_id,
+                        "poll_alias": poll_alias,
+                        "poll_id": poll_id,
+                        "active": True
+                    },
+                )
+
+            await self.db_pool.runInteraction("store_poll_txn", store_poll_txn)
+
+        except Exception as e:
+            logger.error("store_poll with poll_id=%s failed: %s", poll_id, e)
+            raise StoreError(500, "Problem creating poll.")
+
+    async def add_option_to_poll(self, option_name, poll_id, option_number):
+        # TODO Change docstrings for this method
+        """Stores a poll.
+
+        Args:
+            room_id (str): The desired room ID, can be None.
+            room_creator_user_id (str): The user ID of the room creator.
+            is_public (bool): True to indicate that this room should appear in
+            is_channel (bool): Tru to indicate that this room is channel
+            public room lists.
+        Raises:
+            StoreError if the room could not be stored.
+        """
+        try:
+
+            def store_option_txn(txn):
+                self.db_pool.simple_insert_txn(
+                    txn,
+                    "polls_options",
+                    {
+                        "poll_id": poll_id,
+                        "name": option_name,
+                        "count": 0,
+                        "number": option_number
+                    },
+                )
+
+            await self.db_pool.runInteraction("store_option_txn", store_option_txn)
+
+        except Exception as e:
+            logger.error("store_poll with poll_id=%s failed: %s", poll_id, e)
+            raise StoreError(500, "Problem creating poll.")
+
+    async def increment_option_in_poll(self, option_number, poll_id):
+        # TODO Change docstrings for this method
+        """Stores a poll.
+
+        Args:
+            room_id (str): The desired room ID, can be None.
+            room_creator_user_id (str): The user ID of the room creator.
+            is_public (bool): True to indicate that this room should appear in
+            is_channel (bool): Tru to indicate that this room is channel
+            public room lists.
+        Raises:
+            StoreError if the room could not be stored.
+        """
+        try:
+            count = 0
+            old_count = await self.db_pool.simple_select_one_onecol(
+                table="polls_options",
+                keyvalues={"poll_id": poll_id, "number": str(option_number)},
+                retcol="count",
+                desc="get_old_count",
+            )
+            await self.db_pool.simple_update_one(
+                table="polls_options",
+                keyvalues={"poll_id": poll_id, "number": str(option_number)},
+                updatevalues={"count": old_count + 1},
+                desc="update_count",
+            )
+
+            return old_count + 1
+
+        except Exception as e:
+            logger.error("store_poll with poll_id=%s failed: %s", poll_id, e)
+            raise StoreError(500, "Problem creating poll.")
+
+    async def add_voted_user(self, option_number, poll_id, user_id):
+        # TODO Change docstrings for this method
+        """Stores a poll.
+
+        Args:
+            room_id (str): The desired room ID, can be None.
+            room_creator_user_id (str): The user ID of the room creator.
+            is_public (bool): True to indicate that this room should appear in
+            is_channel (bool): Tru to indicate that this room is channel
+            public room lists.
+        Raises:
+            StoreError if the room could not be stored.
+        """
+
+        def store_voted_user_txn(txn):
+            self.db_pool.simple_insert_txn(
+                txn,
+                "voted_users",
+                {
+                    "poll_id": poll_id,
+                    "user_id": user_id,
+                    "number": option_number
+                },
+            )
+
+        await self.db_pool.runInteraction("store_voted_user_txn", store_voted_user_txn)
+
+    async def finish_poll(self, poll_id):
+        # TODO Change docstrings for this method
+        """Stores a poll.finish
+
+        Args:
+            room_id (str): The desired room ID, can be None.
+            room_creator_user_id (str): The user ID of the room creator.
+            is_public (bool): True to indicate that this room should appear in
+            is_channel (bool): Tru to indicate that this room is channel
+            public room lists.
+        Raises:
+            StoreError if the room could not be stored.
+        """
+        try:
+            await self.db_pool.simple_update_one(
+                table="polls",
+                keyvalues={"poll_id": poll_id},
+                updatevalues={"active": False},
+                desc="deactivate_poll",
+            )
+
+        except Exception as e:
+            logger.error("store_poll with poll_id=%s failed: %s", poll_id, e)
+            raise StoreError(500, "Problem deactivate poll.")
+
+    async def get_polls_info(self, room_id):
+        poll_info = await self.db_pool.simple_select_list(
+            table="polls",
+            keyvalues={"room_id": room_id},
+            retcols=["poll_creator_user_id", "poll_id", "poll_alias", "active"],
+            desc="get_polls_creator"
+        )
+        return poll_info
+
+    async def get_one_polls_info(self, poll_id):
+        poll_info = await self.db_pool.simple_select_list(
+            table="polls",
+            keyvalues={"poll_id": poll_id},
+            retcols=["poll_creator_user_id", "poll_alias", "active"],
+            desc="get_polls_creator"
+        )
+        return poll_info
+
+    async def get_polls_options(self, poll_id):
+        options = await self.db_pool.simple_select_list(
+            table="polls_options",
+            keyvalues={"poll_id": poll_id},
+            retcols=["name", "number", "count"],
+            desc="get_polls_options"
+        )
+
+        return options
+
+    async def is_user_voted(self, poll_id, user_id):
+        """ Get's the room_id and server list for a given room_alias
+
+        Args:
+            poll_alias (PollAlias)
+
+        Returns:
+            Deferred: results in namedtuple with keys "room_id" and
+            "servers" or None if no association can be found
+        """
+
+        option_number = await self.db_pool.simple_select_onecol(
+            "voted_users",
+            {
+                "poll_id": poll_id,
+                "user_id": user_id
+            },
+            "number",
+            desc="get_association_from_poll_options",
+        )
+
+        return option_number[0] if option_number else False
