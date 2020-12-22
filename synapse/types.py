@@ -745,3 +745,9 @@ class PollID(DomainSpecificString):
     """Structure representing a poll id. """
 
     SIGIL = "%"
+
+
+class NewsID(DomainSpecificString):
+    """Structure representing a news id. """
+
+    SIGIL = "$"

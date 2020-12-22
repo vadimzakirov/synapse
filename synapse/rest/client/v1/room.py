@@ -48,7 +48,7 @@ from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, 
 from synapse.util import json_decoder
 from synapse.util.stringutils import random_string
 from synapse.handlers.polls import PollCreationHandler, PollModificationHandler, GetPollInfoHandler
-
+from synapse.handlers.news import NewsCreationHandler, NewsModificationHandler
 MYPY = False
 if MYPY:
     import synapse.server
@@ -1023,49 +1023,46 @@ class GetPollInfoRestServlet(RestServlet):
 #         defer.returnValue((200, info))
 
 
-# class GetNewsByUserRestServlet(RestServlet):
-#     PATTERNS = client_patterns("/getNewsByRoom/(?P<room_id>[^/]*)$", v1=True)
-#
-#     def __init__(self, hs):
-#         super(GetNewsByUserRestServlet, self).__init__()
-#         self.get_info = NewsModificationHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     @defer.inlineCallbacks
-#     def on_GET(self, request, room_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.get_info.get_news_by_room_id(requester, room_id)
-#         defer.returnValue((200, info))
-#
-#
-# class GetNewsByIdRestServlet(RestServlet):
-#     PATTERNS = client_patterns("/getNewsByNewsId/(?P<news_id>[^/]*)$", v1=True)
-#
-#     def __init__(self, hs):
-#         super(GetNewsByIdRestServlet, self).__init__()
-#         self.get_info = NewsModificationHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     @defer.inlineCallbacks
-#     def on_GET(self, request, news_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.get_info.get_news_by_news_id(requester, news_id)
-#         defer.returnValue((200, info))
-#
-#
-# class GetUnreadNewsByUserRestServlet(RestServlet):
-#     PATTERNS = client_patterns("/getNewsByRoom/unread/room/(?P<room_id>[^/]*)/user/(?P<user_id>[^/]*)$", v1=True)
-#
-#     def __init__(self, hs):
-#         super(GetUnreadNewsByUserRestServlet, self).__init__()
-#         self.get_info = NewsModificationHandler(hs)
-#         self.auth = hs.get_auth()
-#
-#     @defer.inlineCallbacks
-#     def on_GET(self, request, room_id, user_id):
-#         requester = yield self.auth.get_user_by_req(request)
-#         info = yield self.get_info.get_unread_news_by_room_id(requester, room_id, user_id)
-#         defer.returnValue((200, info))
+class GetNewsByUserRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getNewsByRoom/(?P<room_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetNewsByUserRestServlet, self).__init__()
+        self.get_info = NewsModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_news_by_room_id(requester, room_id)
+        return 200, info
+
+
+class GetNewsByIdRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getNewsByNewsId/(?P<news_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetNewsByIdRestServlet, self).__init__()
+        self.get_info = NewsModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, news_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_news_by_news_id(requester, news_id)
+        return 200, info
+
+
+class GetUnreadNewsByUserRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getNewsByRoom/unread/room/(?P<room_id>[^/]*)/user/(?P<user_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetUnreadNewsByUserRestServlet, self).__init__()
+        self.get_info = NewsModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, room_id, user_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_unread_news_by_room_id(requester, room_id, user_id)
+        return 200, info
 #
 #
 # class GetOuterLinksRestServlet(RestServlet):

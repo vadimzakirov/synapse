@@ -71,6 +71,7 @@ from .transactions import TransactionStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
+from .news import NewsWorkerStore
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,7 @@ class DataStore(
     UIAuthStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
+    NewsWorkerStore
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
