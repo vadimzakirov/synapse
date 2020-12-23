@@ -786,7 +786,7 @@ class RoomCreationHandler(BaseHandler):
                     "room_id": room_id,
                     "sender": user_id,
                     "state_key": "",
-                    "content": {"hide_members": hide_members},
+                    "content": {"hide_members": str(hide_members)},
                 },
                 ratelimit=False,
             )
@@ -801,7 +801,7 @@ class RoomCreationHandler(BaseHandler):
                     "room_id": room_id,
                     "sender": user_id,
                     "state_key": "",
-                    "content": {"is_channel": is_channel},
+                    "content": {"is_channel": str(is_channel)},
                 },
                 ratelimit=False,
             )
