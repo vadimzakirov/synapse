@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -52,8 +52,7 @@ from synapse.handlers.news import NewsCreationHandler, NewsModificationHandler
 from synapse.handlers.bots import BotMenuHandler
 from synapse.handlers.permissions import PermissionsListHandler
 
-MYPY = False
-if MYPY:
+if TYPE_CHECKING:
     import synapse.server
 
 logger = logging.getLogger(__name__)
