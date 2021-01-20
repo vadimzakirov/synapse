@@ -5,6 +5,16 @@ Before upgrading check if any special steps are required to upgrade from the
 version you currently have installed to the current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
+* Check that your versions of Python and PostgreSQL are still supported.
+
+  Synapse follows upstream lifecycles for `Python`_ and `PostgreSQL`_, and
+  removes support for versions which are no longer maintained.
+
+  The website https://endoflife.date also offers convenient summaries.
+
+  .. _Python: https://devguide.python.org/devcycle/#end-of-life-branches
+  .. _PostgreSQL: https://www.postgresql.org/support/versioning/
+
 * If Synapse was installed using `prebuilt packages
   <INSTALL.md#prebuilt-packages>`_, you will need to follow the normal process
   for upgrading those packages.
@@ -75,6 +85,39 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.25.0
+====================
+
+Last release supporting Python 3.5
+----------------------------------
+
+This is the last release of Synapse which guarantees support with Python 3.5,
+which passed its upstream End of Life date several months ago.
+
+We will attempt to maintain support through March 2021, but without guarantees.
+
+In the future, Synapse will follow upstream schedules for ending support of
+older versions of Python and PostgreSQL. Please upgrade to at least Python 3.6
+and PostgreSQL 9.6 as soon as possible.
+
+Blacklisting IP ranges
+----------------------
+
+Synapse v1.25.0 includes new settings, ``ip_range_blacklist`` and
+``ip_range_whitelist``, for controlling outgoing requests from Synapse for federation,
+identity servers, push, and for checking key validity for third-party invite events.
+The previous setting, ``federation_ip_range_blacklist``, is deprecated. The new
+``ip_range_blacklist`` defaults to private IP ranges if it is not defined.
+
+If you have never customised ``federation_ip_range_blacklist`` it is recommended
+that you remove that setting.
+
+If you have customised ``federation_ip_range_blacklist`` you should update the
+setting name to ``ip_range_blacklist``.
+
+If you have a custom push server that is reached via private IP space you may
+need to customise ``ip_range_blacklist`` or ``ip_range_whitelist``.
+
 Upgrading to v1.24.0
 ====================
 
@@ -104,6 +147,28 @@ shown below:
           localpart = map_username_to_mxid_localpart(sso_user_id)
 
           return {"localpart": localpart}
+
+Removal historical Synapse Admin API 
+------------------------------------
+
+Historically, the Synapse Admin API has been accessible under:
+
+* ``/_matrix/client/api/v1/admin``
+* ``/_matrix/client/unstable/admin``
+* ``/_matrix/client/r0/admin``
+* ``/_synapse/admin/v1``
+
+The endpoints with ``/_matrix/client/*`` prefixes have been removed as of v1.24.0.
+The Admin API is now only accessible under:
+
+* ``/_synapse/admin/v1``
+
+The only exception is the `/admin/whois` endpoint, which is
+`also available via the client-server API <https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid>`_.
+
+The deprecation of the old endpoints was announced with Synapse 1.20.0 (released
+on 2020-09-22) and makes it easier for homeserver admins to lock down external
+access to the Admin API endpoints.
 
 Upgrading to v1.23.0
 ====================
