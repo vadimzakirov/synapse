@@ -1410,45 +1410,28 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs, http_server, is_worker=False):
     RoomStateEventRestServlet(hs).register(http_server)
-    RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
-    RoomForgetRestServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
-    SearchRestServlet(hs).register(http_server)
-    JoinedRoomsRestServlet(hs).register(http_server)
-    RoomEventServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-    RoomAliasListServlet(hs).register(http_server)
-    PollCreateRestServlet(hs).register(http_server)
-    AddPollOptionRestServlet(hs).register(http_server)
-    GetPollInfoRestServlet(hs).register(http_server)
-    IncrementPollOptionRestServlet(hs).register(http_server)
-    FinishPollRestServlet(hs).register(http_server)
-    GetNewsByUserRestServlet(hs).register(http_server)
-    GetNewsByIdRestServlet(hs).register(http_server)
-    GetUnreadNewsByUserRestServlet(hs).register(http_server)
-    NewsCreateRestServlet(hs).register(http_server)
-    SetReadMarkerRestServlet(hs).register(http_server)
-    GetRootMenuRestServlet(hs).register(http_server)
-    GetMenuButtonsRestServlet(hs).register(http_server)
-    GetFullMenuButtonsRestServlet(hs).register(http_server)
-    SetReadMarkerRestServlet(hs).register(http_server)
-    GetButtonActionRestServlet(hs).register(http_server)
-    SetRootMenuRestServlet(hs).register(http_server)
-    AddRoomMenuRestServlet(hs).register(http_server)
-    AddMenuButtonRestServlet(hs).register(http_server)
-    MakeBotActionRestServlet(hs).register(http_server)
-    GetPermissionsRestServlet(hs).register(http_server)
+
+    # Some servlets only get registered for the main process.
+    if not is_worker:
+        RoomCreateRestServlet(hs).register(http_server)
+        RoomForgetRestServlet(hs).register(http_server)
+        SearchRestServlet(hs).register(http_server)
+        JoinedRoomsRestServlet(hs).register(http_server)
+        RoomEventServlet(hs).register(http_server)
+        RoomAliasListServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):

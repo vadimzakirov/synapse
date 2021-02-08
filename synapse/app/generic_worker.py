@@ -130,7 +130,7 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
-
+from synapse.storage.databases.main.news import NewsWorkerStore
 logger = logging.getLogger("synapse.app.generic_worker")
 
 
@@ -471,6 +471,7 @@ class GenericWorkerSlavedStore(
     SearchWorkerStore,
     TransactionWorkerStore,
     BaseSlavedStore,
+    NewsWorkerStore
 ):
     pass
 
