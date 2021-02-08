@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional
+from typing import List, Optional
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -46,9 +46,14 @@ from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 from synapse.util import json_decoder
-from synapse.util.stringutils import parse_and_validate_server_name, random_string
+from synapse.util.stringutils import random_string
+from synapse.handlers.polls import PollCreationHandler, PollModificationHandler, GetPollInfoHandler
+from synapse.handlers.news import NewsCreationHandler, NewsModificationHandler
+from synapse.handlers.bots import BotMenuHandler
+from synapse.handlers.permissions import PermissionsListHandler
 
-if TYPE_CHECKING:
+MYPY = False
+if MYPY:
     import synapse.server
 
 logger = logging.getLogger(__name__)
@@ -347,6 +352,8 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             # provided.
             if server:
                 raise e
+            else:
+                pass
 
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
@@ -357,14 +364,6 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
         handler = self.hs.get_room_list_handler()
         if server and server != self.hs.config.server_name:
-            # Ensure the server is valid.
-            try:
-                parse_and_validate_server_name(server)
-            except ValueError:
-                raise SynapseError(
-                    400, "Invalid server name: %s" % (server,), Codes.INVALID_PARAM,
-                )
-
             try:
                 data = await handler.get_remote_public_room_list(
                     server, limit=limit, since_token=since_token
@@ -408,14 +407,6 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
         handler = self.hs.get_room_list_handler()
         if server and server != self.hs.config.server_name:
-            # Ensure the server is valid.
-            try:
-                parse_and_validate_server_name(server)
-            except ValueError:
-                raise SynapseError(
-                    400, "Invalid server name: %s" % (server,), Codes.INVALID_PARAM,
-                )
-
             try:
                 data = await handler.get_remote_public_room_list(
                     server,
@@ -942,6 +933,448 @@ class JoinedRoomsRestServlet(RestServlet):
         room_ids = await self.store.get_rooms_for_user(requester.user.to_string())
         return 200, {"joined_rooms": list(room_ids)}
 
+# New
+
+
+class PollCreateRestServlet(TransactionRestServlet):
+    # No PATTERN; we have custom dispatch rules here
+
+    def __init__(self, hs):
+        super().__init__(hs)
+        self._poll_creation_handler = PollCreationHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/createPoll"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def get_poll_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self._poll_creation_handler.create_poll(requester, self.get_poll_config(request))
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class AddPollOptionRestServlet(TransactionRestServlet):
+    # No PATTERN; we have custom dispatch rules here
+
+    def __init__(self, hs):
+        super().__init__(hs)
+        self._add_option_to_poll = PollModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/addPollOption"
+        register_txn_path(self, PATTERNS, http_server)
+
+
+    def get_poll_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return 200, {}
+
+    def on_POST(self, request):
+        requester = self.auth.get_user_by_req(request)
+        info = self._add_option_to_poll.add_options_to_poll(requester,
+                                                            self.get_poll_config(request)
+                                                            )
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class GetPollInfoRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getPollsInfo/(?P<room_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super().__init__()
+        self.get_info = GetPollInfoHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_polls_from_room_id(requester, room_id)
+        return 200, info
+
+
+class GetPermissionsRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getPermissions(?:/.*)?$", v1=True)
+
+    def __init__(self, hs):
+        super(GetPermissionsRestServlet, self).__init__()
+        self.get_info = PermissionsListHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_permissions(requester)
+        return 200, info
+
+
+class GetNewsByUserRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getNewsByRoom/(?P<room_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetNewsByUserRestServlet, self).__init__()
+        self.get_info = NewsModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_news_by_room_id(requester, room_id)
+        return 200, info
+
+
+class GetNewsByIdRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getNewsByNewsId/(?P<news_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetNewsByIdRestServlet, self).__init__()
+        self.get_info = NewsModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, news_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_news_by_news_id(requester, news_id)
+        return 200, info
+
+
+class GetUnreadNewsByUserRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getNewsByRoom/unread/room/(?P<room_id>[^/]*)/user/(?P<user_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetUnreadNewsByUserRestServlet, self).__init__()
+        self.get_info = NewsModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, room_id, user_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_unread_news_by_room_id(requester, room_id, user_id)
+        return 200, info
+#
+#
+# class GetOuterLinksRestServlet(RestServlet):
+#     PATTERNS = client_patterns("/outer_url(?:/.*)?$", v1=True)
+#
+#     def __init__(self, hs):
+#         super(GetOuterLinksRestServlet, self).__init__()
+#         self.auth = hs.get_auth()
+#
+#     @defer.inlineCallbacks
+#     def on_GET(self, request):
+#         defer.returnValue((200, {"allowed": True}))
+#
+#
+# class GetAttachmentsTypeRestServlet(RestServlet):
+#     PATTERNS = client_patterns("/attachments/(?P<attachments_type>[^/]*)$", v1=True)
+#
+#     def __init__(self, hs):
+#         super(GetAttachmentsTypeRestServlet, self).__init__()
+#         self.auth = hs.get_auth()
+#
+#     @defer.inlineCallbacks
+#     def on_GET(self, request):
+#         defer.returnValue((200, {"allowed": True}))
+
+
+class IncrementPollOptionRestServlet(TransactionRestServlet):
+    # No PATTERN; we have custom dispatch rules here
+
+    def __init__(self, hs):
+        super().__init__(hs)
+        self._inc_option = PollModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/incrementPollOption"
+        register_txn_path(self, PATTERNS, http_server)
+        # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
+
+
+    def get_poll_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return 200, {}
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self._inc_option.increment_option_in_poll(requester,
+                                                               self.get_poll_config(request)
+                                                               )
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class FinishPollRestServlet(TransactionRestServlet):
+    # No PATTERN; we have custom dispatch rules here
+
+    def __init__(self, hs):
+        super().__init__(hs)
+        self._finish_poll = PollModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/finishPoll"
+        register_txn_path(self, PATTERNS, http_server)
+        # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
+
+    def get_poll_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return 200, {}
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self._finish_poll.finish_poll(requester,
+                                                   self.get_poll_config(request)
+                                                   )
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class NewsCreateRestServlet(TransactionRestServlet):
+
+    def __init__(self, hs):
+        super(NewsCreateRestServlet, self).__init__(hs)
+        self._news_creation_handler = NewsCreationHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/addNews"
+        register_txn_path(self, PATTERNS, http_server)
+        # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
+
+    def get_news_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self._news_creation_handler.create_news(requester, self.get_news_config(request))
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class SetReadMarkerRestServlet(TransactionRestServlet):
+
+    def __init__(self, hs):
+        super(SetReadMarkerRestServlet, self).__init__(hs)
+        self._news_mod_handler = NewsModificationHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/setNewsReadMarker"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def get_news_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self._news_mod_handler.set_news_read_marker(requester, self.get_news_config(request))
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+# # Bot Menus
+#
+# # GETTERS
+#
+class GetRootMenuRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getRootMenu/(?P<room_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetRootMenuRestServlet, self).__init__()
+        self.get_info = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_root_menu(requester, room_id)
+        return 200, info
+
+
+class GetMenuButtonsRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getMenuButtons/(?P<menu_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetMenuButtonsRestServlet, self).__init__()
+        self.get_info = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, menu_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_menu_buttons(requester, menu_id)
+        return 200, info
+
+
+class GetFullMenuButtonsRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getFullMenuButtons/(?P<menu_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetFullMenuButtonsRestServlet, self).__init__()
+        self.get_info = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, menu_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_full_menu_buttons(requester, menu_id)
+        return 200, info
+
+
+class GetButtonActionRestServlet(RestServlet):
+    PATTERNS = client_patterns("/getButtonAction/(?P<button_id>[^/]*)$", v1=True)
+
+    def __init__(self, hs):
+        super(GetButtonActionRestServlet, self).__init__()
+        self.get_info = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    async def on_GET(self, request, button_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.get_info.get_button_action(requester, button_id)
+        return 200, info
+
+
+# SETTERS
+class SetRootMenuRestServlet(TransactionRestServlet):
+
+    def __init__(self, hs):
+        super(SetRootMenuRestServlet, self).__init__(hs)
+        self.servlet_handler = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/setMenuAsRoot/(?P<menu_id>[^/]*)$"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request, menu_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.servlet_handler.set_root_menu(requester, menu_id=menu_id)
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class AddRoomMenuRestServlet(TransactionRestServlet):
+    def __init__(self, hs):
+        super(AddRoomMenuRestServlet, self).__init__(hs)
+        self.servlet_handler = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/AddBotMenu/bot/(?P<bot_id>[^/]*)$"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request, bot_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.servlet_handler.add_menu_to_bot(requester, bot_id=bot_id)
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class AddMenuButtonRestServlet(TransactionRestServlet):
+    def __init__(self, hs):
+        super(AddMenuButtonRestServlet, self).__init__(hs)
+        self.servlet_handler = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/AddButtonToMenu/menu/(?P<menu_id>[^/]*)$"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def get_config(self, request):
+        user_supplied_config = parse_json_object_from_request(request)
+        return user_supplied_config
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request, menu_id):
+        requester = await self.auth.get_user_by_req(request)
+        config = self.get_config(request)
+        info = await self.servlet_handler.add_button_to_menu(requester, menu_id=menu_id, config=config)
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
+
+class MakeBotActionRestServlet(TransactionRestServlet):
+    def __init__(self, hs):
+        super(MakeBotActionRestServlet, self).__init__(hs)
+        self.servlet_handler = BotMenuHandler(hs)
+        self.auth = hs.get_auth()
+
+    def register(self, http_server):
+        PATTERNS = "/makeButtonAction/(?P<button_id>[^/]*)/room/(?P<room_id>[^/]*)$"
+        register_txn_path(self, PATTERNS, http_server)
+
+    def on_PUT(self, request, txn_id):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
+
+    async def on_POST(self, request, button_id, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        info = await self.servlet_handler.make_bot_action(requester, button_id=button_id, room_id=room_id)
+        return 200, info
+
+    def on_OPTIONS(self, request):
+        return 200, {}
+
 
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
     """Registers a transaction-based path.
@@ -977,28 +1410,45 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         )
 
 
-def register_servlets(hs, http_server, is_worker=False):
+def register_servlets(hs, http_server):
     RoomStateEventRestServlet(hs).register(http_server)
+    RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
+    RoomForgetRestServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
+    SearchRestServlet(hs).register(http_server)
+    JoinedRoomsRestServlet(hs).register(http_server)
+    RoomEventServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-
-    # Some servlets only get registered for the main process.
-    if not is_worker:
-        RoomCreateRestServlet(hs).register(http_server)
-        RoomForgetRestServlet(hs).register(http_server)
-        SearchRestServlet(hs).register(http_server)
-        JoinedRoomsRestServlet(hs).register(http_server)
-        RoomEventServlet(hs).register(http_server)
-        RoomAliasListServlet(hs).register(http_server)
+    RoomAliasListServlet(hs).register(http_server)
+    PollCreateRestServlet(hs).register(http_server)
+    AddPollOptionRestServlet(hs).register(http_server)
+    GetPollInfoRestServlet(hs).register(http_server)
+    IncrementPollOptionRestServlet(hs).register(http_server)
+    FinishPollRestServlet(hs).register(http_server)
+    GetNewsByUserRestServlet(hs).register(http_server)
+    GetNewsByIdRestServlet(hs).register(http_server)
+    GetUnreadNewsByUserRestServlet(hs).register(http_server)
+    NewsCreateRestServlet(hs).register(http_server)
+    SetReadMarkerRestServlet(hs).register(http_server)
+    GetRootMenuRestServlet(hs).register(http_server)
+    GetMenuButtonsRestServlet(hs).register(http_server)
+    GetFullMenuButtonsRestServlet(hs).register(http_server)
+    SetReadMarkerRestServlet(hs).register(http_server)
+    GetButtonActionRestServlet(hs).register(http_server)
+    SetRootMenuRestServlet(hs).register(http_server)
+    AddRoomMenuRestServlet(hs).register(http_server)
+    AddMenuButtonRestServlet(hs).register(http_server)
+    MakeBotActionRestServlet(hs).register(http_server)
+    GetPermissionsRestServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):
