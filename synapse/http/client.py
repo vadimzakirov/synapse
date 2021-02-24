@@ -145,7 +145,7 @@ class _IPBlacklistingResolver:
         """
         self._reactor = reactor
         self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
+        self._ip_blacklist = []
 
     def resolveHostName(
         self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
