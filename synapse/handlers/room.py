@@ -714,8 +714,11 @@ class RoomCreationHandler(BaseHandler):
             creator_id=user_id,
             is_public=is_public,
             room_version=room_version,
+<<<<<<< HEAD
             is_channel=is_channel,
             hide_members=hide_members
+=======
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
         )
 
         # Check whether this visibility value is blocked by a third party module
@@ -1045,7 +1048,10 @@ class RoomCreationHandler(BaseHandler):
         creator_id: str,
         is_public: bool,
         room_version: RoomVersion,
+<<<<<<< HEAD
         **kwargs
+=======
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
     ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.

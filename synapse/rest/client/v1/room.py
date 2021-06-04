@@ -54,7 +54,7 @@ from synapse.types import (
     UserID,
 )
 from synapse.util import json_decoder
-from synapse.util.stringutils import random_string
+from synapse.util.stringutils import parse_and_validate_server_name, random_string
 from synapse.handlers.polls import PollCreationHandler, PollModificationHandler, GetPollInfoHandler
 from synapse.handlers.news import NewsCreationHandler, NewsModificationHandler
 from synapse.handlers.bots import BotMenuHandler
@@ -63,6 +63,8 @@ from synapse.handlers.permissions import PermissionsListHandler
 MYPY = False
 if MYPY:
     import synapse.server
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -1533,6 +1535,9 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     if hs.config.experimental.spaces_enabled:
         RoomSpaceSummaryRestServlet(hs).register(http_server)
 
+    # Some servlets only get registered for the main process.
+    if hs.config.experimental.spaces_enabled:
+        RoomSpaceSummaryRestServlet(hs).register(http_server)
     if not is_worker:
         RoomCreateRestServlet(hs).register(http_server)
         RoomForgetRestServlet(hs).register(http_server)

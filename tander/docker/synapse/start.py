@@ -254,6 +254,9 @@ running with 'migrate_config'. See the README for more details.
         os.execve("/usr/sbin/gosu", args, environ)
     else:
         os.execve("/usr/local/bin/python", args, environ)
+<<<<<<< HEAD:tander/docker/synapse/start.py
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572:docker/start.py
+=======
 >>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572:docker/start.py
 
 

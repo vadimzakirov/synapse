@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.databases.main.transactions import TransactionStore
-
-from ._base import BaseSlavedStore
-
-
-class SlavedTransactionStore(TransactionStore, BaseSlavedStore):
-    pass
+# Remember to update this number every time a change is made to database
+# schema files, so the users will be informed on server restarts.
+SCHEMA_VERSION = 59

@@ -1,4 +1,4 @@
-/* Copyright 2020 The Matrix.org Foundation C.I.C
+/* Copyright 2021 The Matrix.org Foundation C.I.C
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,5 +13,12 @@
  * limitations under the License.
  */
 
+
+-- We may not have deleted all pushers for deactivated accounts, so we set up a
+-- background job to delete them.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+<<<<<<< HEAD:synapse_tander/storage/databases/main/schema/delta/58/23e2e_cross_signing_keys_idx.sql
   (5823, 'e2e_cross_signing_keys_idx', '{}');
+=======
+  (5908, 'remove_deactivated_pushers', '{}');
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572:synapse/storage/schema/main/delta/59/08delete_pushers_for_deactivated_accounts.sql
