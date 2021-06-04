@@ -73,6 +73,12 @@ class CasHandler:
         self._http_client = hs.get_proxied_http_client()
 
         # identifier for the external_ids table
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD:synapse_tander/handlers/cas_handler.py
+        self._auth_provider_id = "cas"
+=======
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
         self.idp_id = "cas"
 
         # user-facing name of this auth provider
@@ -83,11 +89,18 @@ class CasHandler:
         self.idp_icon = None
         self.idp_brand = None
         self.unstable_idp_brand = None
+<<<<<<< HEAD
 
         self._sso_handler = hs.get_sso_handler()
 
         self._sso_handler.register_identity_provider(self)
 
+=======
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572:synapse/handlers/cas.py
+
+        self._sso_handler = hs.get_sso_handler()
+
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
     def _build_service_param(self, args: Dict[str, str]) -> str:
         """
         Generates a value to use as the "service" parameter when redirecting or
@@ -99,8 +112,19 @@ class CasHandler:
         Returns:
             The URL to use as a "service" parameter.
         """
+<<<<<<< HEAD
         return "%s?%s" % (
             self._cas_service_url,
+=======
+<<<<<<< HEAD:synapse_tander/handlers/cas_handler.py
+        return "%s%s?%s" % (
+            self._cas_service_url,
+            "/_matrix/client/r0/login/cas/ticket",
+=======
+        return "%s?%s" % (
+            self._cas_service_url,
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572:synapse/handlers/cas.py
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
             urllib.parse.urlencode(args),
         )
 
@@ -113,7 +137,11 @@ class CasHandler:
         Args:
             ticket: The CAS ticket from the client.
             service_args: Additional arguments to include in the service URL.
+<<<<<<< HEAD
                 Should be the same as those passed to `handle_redirect_request`.
+=======
+                Should be the same as those passed to `get_redirect_url`.
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
 
         Raises:
             CasError: If there's an error parsing the CAS response.
@@ -192,6 +220,7 @@ class CasHandler:
 
         return CasResponse(user, attributes)
 
+<<<<<<< HEAD
     async def handle_redirect_request(
         self,
         request: SynapseRequest,
@@ -217,6 +246,18 @@ class CasHandler:
             assert client_redirect_url
             service_args = {"redirectUrl": client_redirect_url.decode("utf8")}
 
+=======
+    def get_redirect_url(self, service_args: Dict[str, str]) -> str:
+        """
+        Generates a URL for the CAS server where the client should be redirected.
+
+        Args:
+            service_args: Additional arguments to include in the final redirect URL.
+
+        Returns:
+            The URL to redirect the client to.
+        """
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
         args = urllib.parse.urlencode(
             {"service": self._build_service_param(service_args)}
         )
@@ -298,10 +339,20 @@ class CasHandler:
         # first check if we're doing a UIA
         if session:
             return await self._sso_handler.complete_sso_ui_auth_request(
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD:synapse_tander/handlers/cas_handler.py
+                self._auth_provider_id, cas_response.username, session, request,
+=======
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
                 self.idp_id,
                 cas_response.username,
                 session,
                 request,
+<<<<<<< HEAD
+=======
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572:synapse/handlers/cas.py
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
             )
 
         # otherwise, we're handling a login request.
@@ -384,7 +435,11 @@ class CasHandler:
             return None
 
         await self._sso_handler.complete_sso_login_request(
+<<<<<<< HEAD
             self.idp_id,
+=======
+            self._auth_provider_id,
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572
             cas_response.username,
             request,
             client_redirect_url,

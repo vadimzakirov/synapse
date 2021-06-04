@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -17,8 +16,7 @@
 import logging
 from typing import Any, List
 
-import attr
-
+from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
@@ -27,7 +25,10 @@ from ._util import validate_config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_USER_MAPPING_PROVIDER = (
+DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.saml.DefaultSamlMappingProvider"
+# The module that DefaultSamlMappingProvider is in was renamed, we want to
+# transparently handle both the same.
+LEGACY_USER_MAPPING_PROVIDER = (
     "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
 )
 
@@ -77,7 +78,9 @@ class SAML2Config(Config):
         try:
             check_requirements("saml2")
         except DependencyException as e:
-            raise ConfigError(e.message)
+            raise ConfigError(
+                e.message  # noqa: B306, DependencyException.message is a property
+            )
 
         self.saml2_enabled = True
 
@@ -97,6 +100,8 @@ class SAML2Config(Config):
 
         # Use the default user mapping provider if not set
         ump_dict.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
+        if ump_dict.get("module") == LEGACY_USER_MAPPING_PROVIDER:
+            ump_dict["module"] = DEFAULT_USER_MAPPING_PROVIDER
 
         # Ensure a config is present
         ump_dict["config"] = ump_dict.get("config") or {}
@@ -159,7 +164,13 @@ class SAML2Config(Config):
         config_path = saml2_config.get("config_path", None)
         if config_path is not None:
             mod = load_python_module(config_path)
-            _dict_merge(merge_dict=mod.CONFIG, into_dict=saml2_config_dict)
+            config = getattr(mod, "CONFIG", None)
+            if config is None:
+                raise ConfigError(
+                    "Config path specified by saml2_config.config_path does not "
+                    "have a CONFIG property."
+                )
+            _dict_merge(merge_dict=config, into_dict=saml2_config_dict)
 
         import saml2.config
 
@@ -398,32 +409,18 @@ class SAML2Config(Config):
         }
 
 
-@attr.s(frozen=True)
-class SamlAttributeRequirement:
-    """Object describing a single requirement for SAML attributes."""
-
-    attribute = attr.ib(type=str)
-    value = attr.ib(type=str)
-
-    JSON_SCHEMA = {
-        "type": "object",
-        "properties": {"attribute": {"type": "string"}, "value": {"type": "string"}},
-        "required": ["attribute", "value"],
-    }
-
-
 ATTRIBUTE_REQUIREMENTS_SCHEMA = {
     "type": "array",
-    "items": SamlAttributeRequirement.JSON_SCHEMA,
+    "items": SsoAttributeRequirement.JSON_SCHEMA,
 }
 
 
 def _parse_attribute_requirements_def(
     attribute_requirements: Any,
-) -> List[SamlAttributeRequirement]:
+) -> List[SsoAttributeRequirement]:
     validate_config(
         ATTRIBUTE_REQUIREMENTS_SCHEMA,
         attribute_requirements,
-        config_path=["saml2_config", "attribute_requirements"],
+        config_path=("saml2_config", "attribute_requirements"),
     )
-    return [SamlAttributeRequirement(**x) for x in attribute_requirements]
+    return [SsoAttributeRequirement(**x) for x in attribute_requirements]
