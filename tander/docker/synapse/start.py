@@ -3,6 +3,7 @@
 import codecs
 import glob
 import os
+import platform
 import subprocess
 import sys
 
@@ -205,6 +206,13 @@ def main(args, environ):
     if "-m" not in args:
         args = ["-m", synapse_worker] + args
 
+    jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)
+
+    if os.path.isfile(jemallocpath):
+        environ["LD_PRELOAD"] = jemallocpath
+    else:
+        log("Could not find %s, will not use" % (jemallocpath,))
+
     # if there are no config files passed to synapse, try adding the default file
     if not any(p.startswith("--config-path") or p.startswith("-c") for p in args):
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
@@ -238,6 +246,15 @@ running with 'migrate_config'. See the README for more details.
     log("Starting synapse with args " + " ".join(args))
     os.execv("/usr/local/bin/python", args)
 
+<<<<<<< HEAD:tander/docker/synapse/start.py
+=======
+    args = ["python"] + args
+    if ownership is not None:
+        args = ["gosu", ownership] + args
+        os.execve("/usr/sbin/gosu", args, environ)
+    else:
+        os.execve("/usr/local/bin/python", args, environ)
+>>>>>>> 56667733419ebf070f1a7f7c9a04070f1b944572:docker/start.py
 
 
 if __name__ == "__main__":

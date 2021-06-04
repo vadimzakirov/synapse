@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2019 - 2020 The Matrix.org Foundation C.I.C.
@@ -18,6 +17,7 @@ import logging
 import time
 import unicodedata
 import urllib.parse
+from binascii import crc32
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -35,8 +35,9 @@ from typing import (
 import attr
 import bcrypt
 import pymacaroons
+import unpaddedbase64
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -65,11 +66,13 @@ from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +123,9 @@ def convert_client_dict_legacy_fields_to_identifier(
     # Ensure the identifier has a type
     if "type" not in identifier:
         raise SynapseError(
-            400, "'identifier' dict has no key 'type'", errcode=Codes.MISSING_PARAM,
+            400,
+            "'identifier' dict has no key 'type'",
+            errcode=Codes.MISSING_PARAM,
         )
 
     return identifier
@@ -166,6 +171,16 @@ class SsoLoginExtraAttributes:
     # time the session was created, in milliseconds
     creation_time = attr.ib(type=int)
     extra_attributes = attr.ib(type=JsonDict)
+
+
+@attr.s(slots=True, frozen=True)
+class LoginTokenAttributes:
+    """Data we store in a short-term login token"""
+
+    user_id = attr.ib(type=str)
+
+    # the SSO Identity Provider that the user authenticated with, to get this token
+    auth_provider_id = attr.ib(type=str)
 
 
 class AuthHandler(BaseHandler):
@@ -225,6 +240,7 @@ class AuthHandler(BaseHandler):
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
         self._failed_uia_attempts_ratelimiter = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
             burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
@@ -235,6 +251,7 @@ class AuthHandler(BaseHandler):
 
         # Ratelimitier for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
+            store=self.store,
             clock=hs.get_clock(),
             rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
             burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
@@ -324,7 +341,8 @@ class AuthHandler(BaseHandler):
                 user is too high to proceed
 
         """
-
+        if not requester.access_token_id:
+            raise ValueError("Cannot validate a user without an access token")
         if self._ui_auth_session_timeout:
             last_validated = await self.store.get_access_token_last_validated(
                 requester.access_token_id
@@ -338,7 +356,7 @@ class AuthHandler(BaseHandler):
         requester_user_id = requester.user.to_string()
 
         # Check if we should be ratelimited due to too many previous failed attempts
-        self._failed_uia_attempts_ratelimiter.ratelimit(requester_user_id, update=False)
+        await self._failed_uia_attempts_ratelimiter.ratelimit(requester, update=False)
 
         # build a list of supported flows
         supported_ui_auth_types = await self._get_available_ui_auth_types(
@@ -351,11 +369,17 @@ class AuthHandler(BaseHandler):
 
         try:
             result, params, session_id = await self.check_ui_auth(
-                flows, request, request_body, description, get_new_session_data,
+                flows,
+                request,
+                request_body,
+                description,
+                get_new_session_data,
             )
         except LoginError:
             # Update the ratelimiter to say we failed (`can_do_action` doesn't raise).
-            self._failed_uia_attempts_ratelimiter.can_do_action(requester_user_id)
+            await self._failed_uia_attempts_ratelimiter.can_do_action(
+                requester,
+            )
             raise
 
         # find the completed login type
@@ -379,8 +403,7 @@ class AuthHandler(BaseHandler):
         return params, session_id
 
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
-        """Get a list of the authentication types this user can use
-        """
+        """Get a list of the authentication types this user can use"""
 
         ui_auth_types = set()
 
@@ -476,7 +499,7 @@ class AuthHandler(BaseHandler):
             sid = authdict["session"]
 
         # Convert the URI and method to strings.
-        uri = request.uri.decode("utf-8")
+        uri = request.uri.decode("utf-8")  # type: ignore
         method = request.method.decode("utf-8")
 
         # If there's no session ID, create a new session.
@@ -723,7 +746,9 @@ class AuthHandler(BaseHandler):
         }
 
     def _auth_dict_for_flows(
-        self, flows: List[List[str]], session_id: str,
+        self,
+        flows: List[List[str]],
+        session_id: str,
     ) -> Dict[str, Any]:
         public_flows = []
         for f in flows:
@@ -786,10 +811,12 @@ class AuthHandler(BaseHandler):
             logger.info(
                 "Logging in user %s as %s%s", user_id, puppets_user_id, fmt_expiry
             )
+            target_user_id_obj = UserID.from_string(puppets_user_id)
         else:
             logger.info(
                 "Logging in user %s on device %s%s", user_id, device_id, fmt_expiry
             )
+            target_user_id_obj = UserID.from_string(user_id)
 
         if (
             not is_appservice_ghost
@@ -797,7 +824,7 @@ class AuthHandler(BaseHandler):
         ):
             await self.auth.check_auth_blocking(user_id)
 
-        access_token = self.macaroon_gen.generate_access_token(user_id)
+        access_token = self.generate_access_token(target_user_id_obj)
         await self.store.add_access_token_to_user(
             user_id=user_id,
             token=access_token,
@@ -867,6 +894,19 @@ class AuthHandler(BaseHandler):
             )
         return result
 
+    def can_change_password(self) -> bool:
+        """Get whether users on this server are allowed to change or set a password.
+
+        Both `config.password_enabled` and `config.password_localdb_enabled` must be true.
+
+        Note that any account (even SSO accounts) are allowed to add passwords if the above
+        is true.
+
+        Returns:
+            Whether users on this server are allowed to change or set a password
+        """
+        return self._password_enabled and self._password_localdb_enabled
+
     def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API
 
@@ -880,7 +920,9 @@ class AuthHandler(BaseHandler):
         return self._supported_login_types
 
     async def validate_login(
-        self, login_submission: Dict[str, Any], ratelimit: bool = False,
+        self,
+        login_submission: Dict[str, Any],
+        ratelimit: bool = False,
     ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
@@ -948,8 +990,8 @@ class AuthHandler(BaseHandler):
             # We also apply account rate limiting using the 3PID as a key, as
             # otherwise using 3PID bypasses the ratelimiting based on user ID.
             if ratelimit:
-                self._failed_login_attempts_ratelimiter.ratelimit(
-                    (medium, address), update=False
+                await self._failed_login_attempts_ratelimiter.ratelimit(
+                    None, (medium, address), update=False
                 )
 
             # Check for login providers that support 3pid login types
@@ -982,8 +1024,8 @@ class AuthHandler(BaseHandler):
                 # this code path, which is fine as then the per-user ratelimit
                 # will kick in below.
                 if ratelimit:
-                    self._failed_login_attempts_ratelimiter.can_do_action(
-                        (medium, address)
+                    await self._failed_login_attempts_ratelimiter.can_do_action(
+                        None, (medium, address)
                     )
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
@@ -1005,8 +1047,8 @@ class AuthHandler(BaseHandler):
 
         # Check if we've hit the failed ratelimit (but don't update it)
         if ratelimit:
-            self._failed_login_attempts_ratelimiter.ratelimit(
-                qualified_user_id.lower(), update=False
+            await self._failed_login_attempts_ratelimiter.ratelimit(
+                None, qualified_user_id.lower(), update=False
             )
 
         try:
@@ -1017,13 +1059,15 @@ class AuthHandler(BaseHandler):
             # exception and masking the LoginError. The actual ratelimiting
             # should have happened above.
             if ratelimit:
-                self._failed_login_attempts_ratelimiter.can_do_action(
-                    qualified_user_id.lower()
+                await self._failed_login_attempts_ratelimiter.can_do_action(
+                    None, qualified_user_id.lower()
                 )
             raise
 
     async def _validate_userid_login(
-        self, username: str, login_submission: Dict[str, Any],
+        self,
+        username: str,
+        login_submission: Dict[str, Any],
     ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Helper for validate_login
 
@@ -1153,18 +1197,29 @@ class AuthHandler(BaseHandler):
             return None
         return user_id
 
-    async def validate_short_term_login_token_and_get_user_id(self, login_token: str):
-        auth_api = self.hs.get_auth()
-        user_id = None
+    def generate_access_token(self, for_user: UserID) -> str:
+        """Generates an opaque string, for use as an access token"""
+
+        # we use the following format for access tokens:
+        #    syt_<base64 local part>_<random string>_<base62 crc check>
+
+        b64local = unpaddedbase64.encode_base64(for_user.localpart.encode("utf-8"))
+        random_string = stringutils.random_string(20)
+        base = f"syt_{b64local}_{random_string}"
+
+        crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        return f"{base}_{crc}"
+
+    async def validate_short_term_login_token(
+        self, login_token: str
+    ) -> LoginTokenAttributes:
         try:
-            macaroon = pymacaroons.Macaroon.deserialize(login_token)
-            user_id = auth_api.get_user_id_from_macaroon(macaroon)
-            auth_api.validate_macaroon(macaroon, "login", user_id)
+            res = self.macaroon_gen.verify_short_term_login_token(login_token)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
 
-        await self.auth.check_auth_blocking(user_id)
-        return user_id
+        await self.auth.check_auth_blocking(res.user_id)
+        return res
 
     async def delete_access_token(self, access_token: str):
         """Invalidate a single access token
@@ -1193,7 +1248,7 @@ class AuthHandler(BaseHandler):
     async def delete_access_tokens_for_user(
         self,
         user_id: str,
-        except_token_id: Optional[str] = None,
+        except_token_id: Optional[int] = None,
         device_id: Optional[str] = None,
     ):
         """Invalidate access tokens belonging to a user
@@ -1211,7 +1266,7 @@ class AuthHandler(BaseHandler):
 
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
-            for token, token_id, device_id in tokens_and_devices:
+            for token, _, device_id in tokens_and_devices:
                 await provider.on_logged_out(
                     user_id=user_id, device_id=device_id, access_token=token
                 )
@@ -1386,6 +1441,7 @@ class AuthHandler(BaseHandler):
     async def complete_sso_login(
         self,
         registered_user_id: str,
+        auth_provider_id: str,
         request: Request,
         client_redirect_url: str,
         extra_attributes: Optional[JsonDict] = None,
@@ -1395,6 +1451,9 @@ class AuthHandler(BaseHandler):
 
         Args:
             registered_user_id: The registered user ID to complete SSO login for.
+            auth_provider_id: The id of the SSO Identity provider that was used for
+                login. This will be stored in the login token for future tracking in
+                prometheus metrics.
             request: The request to complete.
             client_redirect_url: The URL to which to redirect the user at the end of the
                 process.
@@ -1416,6 +1475,7 @@ class AuthHandler(BaseHandler):
 
         self._complete_sso_login(
             registered_user_id,
+            auth_provider_id,
             request,
             client_redirect_url,
             extra_attributes,
@@ -1426,6 +1486,7 @@ class AuthHandler(BaseHandler):
     def _complete_sso_login(
         self,
         registered_user_id: str,
+        auth_provider_id: str,
         request: Request,
         client_redirect_url: str,
         extra_attributes: Optional[JsonDict] = None,
@@ -1446,12 +1507,13 @@ class AuthHandler(BaseHandler):
         # is considered OK since the newest SSO attributes should be most valid.
         if extra_attributes:
             self._extra_attributes[registered_user_id] = SsoLoginExtraAttributes(
-                self._clock.time_msec(), extra_attributes,
+                self._clock.time_msec(),
+                extra_attributes,
             )
 
         # Create a login token
         login_token = self.macaroon_gen.generate_short_term_login_token(
-            registered_user_id
+            registered_user_id, auth_provider_id=auth_provider_id
         )
 
         # Append the login token to the original redirect URL (i.e. with its query
@@ -1472,10 +1534,22 @@ class AuthHandler(BaseHandler):
         # Remove the query parameters from the redirect URL to get a shorter version of
         # it. This is only to display a human-readable URL in the template, but not the
         # URL we redirect users to.
-        redirect_url_no_params = client_redirect_url.split("?")[0]
+        url_parts = urllib.parse.urlsplit(client_redirect_url)
+
+        if url_parts.scheme == "https":
+            # for an https uri, just show the netloc (ie, the hostname. Specifically,
+            # the bit between "//" and "/"; this includes any potential
+            # "username:password@" prefix.)
+            display_url = url_parts.netloc
+        else:
+            # for other uris, strip the query-params (including the login token) and
+            # fragment.
+            display_url = urllib.parse.urlunsplit(
+                (url_parts.scheme, url_parts.netloc, url_parts.path, "", "")
+            )
 
         html = self._sso_redirect_confirm_template.render(
-            display_url=redirect_url_no_params,
+            display_url=display_url,
             redirect_url=redirect_url,
             server_name=self._server_name,
             new_user=new_user,
@@ -1529,10 +1603,7 @@ class MacaroonGenerator:
 
     hs = attr.ib()
 
-    def generate_access_token(
-        self, user_id: str, extra_caveats: Optional[List[str]] = None
-    ) -> str:
-        extra_caveats = extra_caveats or []
+    def generate_guest_access_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = access")
         # Include a nonce, to make sure that each login gets a different
@@ -1540,19 +1611,51 @@ class MacaroonGenerator:
         macaroon.add_first_party_caveat(
             "nonce = %s" % (stringutils.random_string_with_symbols(16),)
         )
-        for caveat in extra_caveats:
-            macaroon.add_first_party_caveat(caveat)
+        macaroon.add_first_party_caveat("guest = true")
         return macaroon.serialize()
 
     def generate_short_term_login_token(
-        self, user_id: str, duration_in_ms: int = (2 * 60 * 1000)
+        self,
+        user_id: str,
+        auth_provider_id: str,
+        duration_in_ms: int = (2 * 60 * 1000),
     ) -> str:
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
         now = self.hs.get_clock().time_msec()
         expiry = now + duration_in_ms
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        macaroon.add_first_party_caveat("auth_provider_id = %s" % (auth_provider_id,))
         return macaroon.serialize()
+
+    def verify_short_term_login_token(self, token: str) -> LoginTokenAttributes:
+        """Verify a short-term-login macaroon
+
+        Checks that the given token is a valid, unexpired short-term-login token
+        minted by this server.
+
+        Args:
+            token: the login token to verify
+
+        Returns:
+            the user_id that this token is valid for
+
+        Raises:
+            MacaroonVerificationFailedException if the verification failed
+        """
+        macaroon = pymacaroons.Macaroon.deserialize(token)
+        user_id = get_value_from_macaroon(macaroon, "user_id")
+        auth_provider_id = get_value_from_macaroon(macaroon, "auth_provider_id")
+
+        v = pymacaroons.Verifier()
+        v.satisfy_exact("gen = 1")
+        v.satisfy_exact("type = login")
+        v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.satisfy_general(lambda c: c.startswith("auth_provider_id = "))
+        satisfy_expiry(v, self.hs.get_clock().time_msec)
+        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
+
+        return LoginTokenAttributes(user_id=user_id, auth_provider_id=auth_provider_id)
 
     def generate_delete_pusher_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
@@ -1690,5 +1793,9 @@ class PasswordProvider:
         # This might return an awaitable, if it does block the log out
         # until it completes.
         await maybe_awaitable(
-            g(user_id=user_id, device_id=device_id, access_token=access_token,)
+            g(
+                user_id=user_id,
+                device_id=device_id,
+                access_token=access_token,
+            )
         )
